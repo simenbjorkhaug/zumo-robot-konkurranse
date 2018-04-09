@@ -11,12 +11,12 @@ L3G gyro;
 // these might need to be tuned for different motor types
 #define QTR_THRESHOLD 400 
 #define REVERSE_SPEED 200 // 0 is stopped, 400 is full speed
-#define TURN_SPEED 400
+#define TURN_SPEED 300
 #define FORWARD_SPEED 200
 #define TURBO_SPEED 400
 
-const int echoPin1 = 6;
-const int triggerPin1 = 7;
+const int echoPin1 = 3;
+const int triggerPin1 = 2;
 const int echoPin2 = 3;
 const int triggerPin2 = 2;
 const int maxDistance = 40;
@@ -32,7 +32,7 @@ ZumoReflectanceSensorArray sensors(QTR_NO_EMITTER_PIN); // Tell Zumo that we hav
 Pushbutton button(ZUMO_BUTTON);
 
 void setup() {
-  
+  Serial.begin(9600);
   sensors.init();
   button.waitForButton();  // wait to start calibration
 
@@ -59,34 +59,36 @@ void setup() {
 }
 
 
-void turnDegrees(int degrees, boolean reverse, int angle) {
+void turnDegrees(int degrees, boolean checkReverse, int angle) {
 
   turnSensorReset();
   
-  if (reverse) {
-    forward(-FORWARD_SPEED,-FORWARD_SPEED);
-    delay(FORWARD_SPEED);
-    forward(-TURN_SPEED, TURN_SPEED);
-  } else {
-    forward(-TURN_SPEED, TURN_SPEED); 
+  if (checkReverse) {
+    reverse(400.00, 400.00, 0.2);
   }
+
+  forward(-TURN_SPEED, TURN_SPEED);
   
   do {
-    if (readSonar(sonar1) != 0.0 &! reverse) break;  
+    if (readSonar(sonar1) != 0.0) break;  
     delay(1);
     turnSensorUpdate();
     angle = (((int32_t)turnAngle >> 16) * 360) >> 16;
   }
   while (angle < degrees);
   
-  forward(0.0, 0.0);
+  // forward(0.0, 0.0);
+}
+
+void reverse(double speed1, double speed2, double delayTime) {
+  forward(-speed1, -speed2);
+  delay(1000 * delayTime);
 }
 
 
-boolean checkLine(int turnRate) {
+boolean checkLine() {
   sensors.read(sensor_values);
   if (sensor_values[0] < QTR_THRESHOLD || sensor_values[5] < QTR_THRESHOLD) {
-    turnDegrees(turnRate, true, 0);
     return true;
   } 
   return false;
@@ -101,13 +103,22 @@ void forward(double speed1, double speed2) {
 }
 
 void loop() {
-  
-  checkLine(40);
-  if (readSonar(sonar1) == 0.0) {
-    turnDegrees(60, false, 0);
-  } else if (readSonar(sonar1) <= maxDistance) {
-    forward(TURBO_SPEED, TURBO_SPEED);
-  }
+    
+    if (checkLine()) {
+     turnDegrees(160, true, 0);
+    }
+    
+    if (readSonar(sonar1) == 0.0) {
+      turnDegrees(1, false, 0); // spin
+    } else if (readSonar(sonar1) <= maxDistance) {
+      forward(TURBO_SPEED, TURBO_SPEED);
+      int i = 0;
+      while(i < 200) {
+        if (checkLine()) break;
+        delay(1);
+        i++;
+      }
+   }
   
 }
 
